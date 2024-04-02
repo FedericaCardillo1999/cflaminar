@@ -13,11 +13,11 @@ ftol: 1e-4
 grid_nr: 20         #number of items in grid
 rsq_threshold: 0.01  #
 #
-TR: 3.0
+TR: 1.5
 #
 filter_predictions : False # Other options to do filtering...
-n_jobs : 6 # For paralellisation, how many jobs to split off into
-n_batches : 6 # For paralellisation at grid stage...
+n_jobs : 10 # For paralellisation, how many jobs to split off into
+n_batches : 10 # For paralellisation at grid stage...
 # ***** APPLIES TO PRF MODELS *****
 # space our pRF lives in
 vf_extent: [-5, 5]

@@ -15,7 +15,6 @@ subject=sub-$1
 
 export SURF_DIR=${DIR_DATA_DERIV}/freesurfer/$subject
 
-#conda activate mypy311
 python -m neuropythy atlas $subject --volume-export --verbose
 
 #create labels for pycortex
@@ -29,6 +28,5 @@ done
 mkdir -p ${DIR_DATA_DERIV}/benson_mask/${subject}/ses-1
 mri_binarize --dilate 3 --i ${SURF_DIR}/mri/benson14_varea.mgz --match 1 2 3 7 8 --o ${DIR_DATA_DERIV}/benson_mask/${subject}/ses-1/${subject}_ses-1_desc-benson_mask.nii.gz
 
-conda deactivate
 
-mv -v ${DIR_DATA_DERIV}/freesurfer/$subject ${DIR_DATA_DERIV}/fs_ores/
+
