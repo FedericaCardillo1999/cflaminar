@@ -44,7 +44,7 @@ elif atlas =='manual':
 
 # ## Load design matrix
 
-dm =scipy.io.loadmat(f'{MAIN_PATH}/pRFM/design_task-ret.mat')['stim'] #same design matrix for all subjects
+dm =scipy.io.loadmat(f'{MAIN_PATH}/pRFM4curve/design_task-ret.mat')['stim'] #same design matrix for all subjects
 # You can see we have a binarized matrix, of a bar moving across the screen...
 fig = plt.figure()
 rows = 10
@@ -62,34 +62,34 @@ dm.shape
 # When setting up the model it is important to be clear what settings you are using, and make it easily reproducible. To that end it is recommended that you keep all the specific values in a .yml file, which can be loaded in (rather than hard coding "magic" numbers in your script)
 
 # Load the settings from .yml file
-prf_settings_file = f'{MAIN_PATH}/pRFM/fit_settings_prf_pilot1.yml' #same prf settings for all subjects
+prf_settings_file = f'{MAIN_PATH}/pRFM4curve/fit_settings_prf_pilot1.yml' #same prf settings for all subjects
 with open(prf_settings_file) as f:
     prf_settings = yaml.safe_load(f)
 
 
 # # Creating stimulus object
 # Before fitting the PRFs we need to create the design matrix, i.e., a binary representation of the stimulus. The stimuli used in this example is a bar moving across the visual field (see eg_screen_shot.png for an example).
-# 
+#
 # prfpy needs the design matrix to be a numpy array of n x n x time points. Each time point will correspond to the timepoints in the fMRI sequence. n is the number of pixels in the design matrix.
-# 
+#
 # Going from the stimulus shown in the scanner to the n x n x timepoints in the design matrix involves 3 steps:
-# 
+#
 # [1] Binarize the stimulus (where there is stimulus=1, no stimulus=0)
-# 
+#
 # [2] Make it square (i.e., cut off the unstimulated part of the screen). This is because typically the stimuli are presented in a circular aperture; therefore including the full rectangle of the screen is unnecessary.
-# 
+#
 # [3] Downsample the stimulus (so that it can run faster, e.g., from 1080 x 1080 to 100 x 100)
-# 
+#
 # If you want you could also just recreate the design matrix from same parameters you used to make the stimulus (i.e., defining bar/wedge position over time). This doesn't matter
 
 
-# Now we need to enter the design matrix in a way that prfpy can read it. 
+# Now we need to enter the design matrix in a way that prfpy can read it.
 # We do this using the PRFStimulus2D object
 # Information we need
 # -> Screen size (height), and distance (to the eye)
 # This is so that we can convert into degrees of visual angle (dov)
 # -> TR: This is so that we know the time (in s), of each 'frame' / pt in the time series
-# Here we have 225 time points. So total length of scan was TR * 225 (1.5*225) 
+# Here we have 225 time points. So total length of scan was TR * 225 (1.5*225)
 prf_stim = PRFStimulus2D(
     screen_size_cm=prf_settings['screen_size_cm'],          # Distance of screen to eye
     screen_distance_cm=prf_settings['screen_distance_cm'],  # height of the screen (i.e., the diameter of the stimulated region)
@@ -103,32 +103,32 @@ print(f'Screen size in degrees of visual angle = {prf_stim.screen_size_degrees}'
 
 
 # # Preparing the data
-# The next step is to prepare the fMRI time series. The format that prfpy wants is a numpy array of number of 
-# For prfpy the time series needs to be 2D numpy array, where the first dimension is units (i.e., voxels or vertices) and the second dimension is time. The number of timepoints in your data should match the number in the design matrix (here it is 225). 
-# 
+# The next step is to prepare the fMRI time series. The format that prfpy wants is a numpy array of number of
+# For prfpy the time series needs to be 2D numpy array, where the first dimension is units (i.e., voxels or vertices) and the second dimension is time. The number of timepoints in your data should match the number in the design matrix (here it is 225).
+#
 # A couple of notes:
-# 
-# [*] Preprocessing? I assume that all of the important stuff, i.e., denoising, removing confounds has been done already. This is just to prepare the data for prfpy specifically. 
-# 
-# [*] Averaging? The more runs (i.e., repetitions of the same stimulus) you average over, the less noise, and the better the prf estimates will be. You can fit on a single run (especially in high SNR situations, e.g., using 7T) without averaging, but quality will be less good. 
-# 
+#
+# [*] Preprocessing? I assume that all of the important stuff, i.e., denoising, removing confounds has been done already. This is just to prepare the data for prfpy specifically.
+#
+# [*] Averaging? The more runs (i.e., repetitions of the same stimulus) you average over, the less noise, and the better the prf estimates will be. You can fit on a single run (especially in high SNR situations, e.g., using 7T) without averaging, but quality will be less good.
+#
 # [*] Voxels or vertices? In principle you can fit any time series data with a prf model. I always fit using vertices, with the data sampled to the cortical surface. This will make visualisations much easier, if you want to plot your PRF parameters on the cortical surface. You can then use tools like pycortex
-# 
+#
 # [*] Percent signal change? Again, in principle you can fit any time series data with a prf model. I use percent signal change, with the baseline set to 0. Why do this? It makes it easier to compare timeseries across voxels when the units are the same (as opposed to the arbitrary values you get out of "raw" fMRI data). Also, if you do *not* set the baseline value to 0 (i.e. the amplitude of the prf model when there is 0 stimulation) you need to fit it for each vertex. There are also added complications when you have PRFs with inhibitory components. Another option is to use z-scoring rather than psc.
-# 
-# [*] Include first part of timeseries? Some people will remove the first (e.g.,5) timepoints of the fMRI data. This is because perhaps it takes a couple of seconds for the subject to get used to the scanner / stimulus or maybe there are startup effects... If you want to do this, make sure you make the corresponding changes to the design matrix.  
-# 
+#
+# [*] Include first part of timeseries? Some people will remove the first (e.g.,5) timepoints of the fMRI data. This is because perhaps it takes a couple of seconds for the subject to get used to the scanner / stimulus or maybe there are startup effects... If you want to do this, make sure you make the corresponding changes to the design matrix.
+#
 # ### Steps, using example data
 # I have provided some example time series data for 100 vertices
-# 
+#
 # [1] Convert to percent signal change
-# 
+#
 # [2] Set the median value during the baseline condition (i.e., when there is no stimulation) to zero
-# 
+#
 # See functions in marcus_prf_eg/utils for more details
-# 
+#
 
-# Example, raw time series. You can already see the peaks corresponding to the bar passes. 
+# Example, raw time series. You can already see the peaks corresponding to the bar passes.
 # But the units are arbitrary... We want to change it to be in psc
 # Also we can improve the SNR by averaging over the 2 runs...
 
@@ -142,7 +142,7 @@ print(f'Screen size in degrees of visual angle = {prf_stim.screen_size_degrees}'
 #
 # print('''Now we can see what the the time series looks like after psc, baselining and averaging:''')
 # psc_avg_ts=np.load('/Users/mayra/PycharmProjects/Github/marcus_prfpy_tutorial/pilot1/ses-1/sub-001_ses-1_task-ret_hemi-LR_desc-avg_bold.npy').T[:,:]
-psc_avg_ts_full=np.load(f'{MAIN_PATH}/pRFM/{subject}/ses-1/{denoising}/{subject}_ses-1_task-ret_hemi-LR_desc-avg_bold_{depth}.npy').T[:,:]
+psc_avg_ts_full=np.load(f'{MAIN_PATH}/pRFM4curve/{subject}/ses-1/{denoising}/{subject}_ses-1_task-ret_hemi-LR_desc-avg_bold_{depth}.npy').T[:,:]
 print(psc_avg_ts_full.shape)
 
 if psc_avg_ts_full.shape[1]>225:
@@ -204,7 +204,7 @@ rois_idx=cortex.Vertex.empty(subject)
 for r in range(rois.__len__()):
     roi_idx = np.where(rois[r] == rois_list[0, :])
     #roi_verts = np.array(np.where(idx_vls4 == int(rois_list[1, roi_idx])))[0]
-    roi_verts = np.where(np.logical_and(idx_vls4 == int(rois_list[1, roi_idx][0][0]),idx_vls1<15))[0]
+    roi_verts = np.where(np.logical_and(idx_vls4 == int(rois_list[1, roi_idx][0][0]),idx_vls1<6))[0]
     rois_mask.data[roi_verts]=1
     rois_idx.data[roi_verts]=roi_verts
 
@@ -216,14 +216,14 @@ psc_avg_ts_full[rois_mask.data!=1]=0
 
 # # Creating the (gaussian) model
 # Now we can create the PRF model. The simplest is the 2D isometric (i.e., circular) gaussian
-# 
-# 
+#
+#
 # The Iso2DGaussianModel class is used to create an 2D gaussian model instance.
 # There are a few parameters you can set. See below (copied from prfpy documentation), for details.
 # Note you can also fit the HRF
 
 
-'''    
+'''
     """__init__ for Iso2DGaussianModel
     constructor, sets up stimulus and hrf for this Model
     Parameters
@@ -252,7 +252,7 @@ gauss_model = Iso2DGaussianModel(
 
 # # Creating the gaussian fitter
 # Now we need to make a fitter, to load in the data
-# 
+#
 
 gauss_fitter=Iso2DGaussianFitter(
     data=psc_avg_ts[:,:],    # time series
@@ -268,7 +268,7 @@ gauss_fitter=Iso2DGaussianFitter(
 
 max_eccentricity = round(prf_stim.screen_size_degrees/2) # It doesn't make sense to look for PRFs which are outside the stimulated region
 grid_nr = prf_settings['grid_nr'] # Size of the grid (i.e., number of possible PRF models). Higher number means that the grid fit will be more exact, but take longer...
-eccs    = np.linspace(0.1, max_eccentricity*1.1, grid_nr)  # Squared because of cortical magnification, more efficiently tiles the visual field...
+eccs    = np.linspace(0.1, max_eccentricity, grid_nr)  # Squared because of cortical magnification, more efficiently tiles the visual field...
 sizes   =  np.linspace(0.1, max_eccentricity, int(grid_nr))   # Possible size values (i.e., sigma in gaussian model)
 polars  = np.linspace(0, 2*np.pi, int(grid_nr))              # Possible polar angle coordinates
 
@@ -286,7 +286,7 @@ hrf_2_grid = np.array([0.0]) #fixed
 
 # We also want to put some boundaries on possible values
 # We set the baseline to 0, so we want to fix that here. 'fixed_grid_baseline=0'
-# In addition, there is the amplitude parameter (which scales the response). 
+# In addition, there is the amplitude parameter (which scales the response).
 # We want to put an upper limit for this too, so that we don't get strange responses
 
 # ## Stage 1: grid search
@@ -328,9 +328,9 @@ else:
     g_constraints = None # uses l-BFGS (which is faster)
 
 gauss_iter_bounds = [
-    (-1.1*max_eccentricity, 1.1*max_eccentricity),          # x bound
-    (-1.1*max_eccentricity, 1.1*max_eccentricity),          # y bound
-    (1e-1, 1*max_eccentricity),                             # prf size bounds
+    (-max_eccentricity, max_eccentricity),          # x bound
+    (-max_eccentricity, max_eccentricity),          # y bound
+    (1e-1, max_eccentricity),                             # prf size bounds
     (prf_settings['prf_ampl'][0],prf_settings['prf_ampl'][1]),      # prf amplitude
     (prf_settings['bold_bsl'][0],prf_settings['bold_bsl'][1]),      # bold baseline (fixed)
     (prf_settings['hrf']['deriv_bound'][0], prf_settings['hrf']['deriv_bound'][1]), # hrf_1 bound
@@ -368,8 +368,8 @@ best_vx=np.where(gauss_fitter.iterative_search_params[:,-1]==gauss_fitter.iterat
 best_vx
 
 # # WELL DONE!
-# We now have a set of prf fits. 
-# 
+# We now have a set of prf fits.
+#
 
 
 # We can now create the predicted timeseries, and compare these with the data
@@ -400,7 +400,7 @@ i_vx = int(best_vx[0])
 #i_vx=24798
 
 # ************* TIME COURSE PLOT *************
-time_pts = np.arange(psc_avg_ts.shape[1]) * TR_s    
+time_pts = np.arange(psc_avg_ts.shape[1]) * TR_s
 ax2 = subfigs[1].add_subplot()
 ax2.plot(time_pts, psc_avg_ts[i_vx,:], '-+k', label= 'data')
 ax2.plot(time_pts, pred_tc[i_vx,:], '-*r', label= 'pred')
@@ -459,9 +459,9 @@ import pickle
 def save_params(model, model_name):
 
     if rois.__len__()==1:
-        pkl_file = opj(f'{MAIN_PATH}/pRFM/{subject}/ses-1/{denoising}/', f'roi-{rois[0]}_model-{atlas}-{model_name}-{depth}_desc-prf_params.pkl')
+        pkl_file = opj(f'{MAIN_PATH}/pRFM4curve/{subject}/ses-1/{denoising}/', f'roi-{rois[0]}_model-{atlas}-{model_name}-{depth}_desc-prf_params.pkl')
     else:
-        pkl_file = opj(f'{MAIN_PATH}/pRFM/{subject}/ses-1/{denoising}/', f'model-{atlas}-{model_name}-{depth}_desc-prf_params.pkl')
+        pkl_file = opj(f'{MAIN_PATH}/pRFM4curve/{subject}/ses-1/{denoising}/', f'model-{atlas}-{model_name}-{depth}_desc-prf_params.pkl')
 
     # get parameters given model and stage
     model=model
@@ -491,6 +491,4 @@ def save_params(model, model_name):
     f.close()
 
 
-save_params(gauss_fitter, 'nelder-mead')
-
-
+save_params(gauss_fitter, 'gauss_fitter')

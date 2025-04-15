@@ -1,24 +1,20 @@
 # cflaminar
 Preprocessing pipeline for CF analysis across the cortical depth
 
-[![Documentation Status] ADDLINK TO WEBPAGE
-
-![plot]ADDFIGURE
-
+![plot](https://github.com/mayrabitt/cflaminar/blob/main/overview.png)
 ## In active development
-This package is still in development and its API might change. Documentation for this package can be found at [ADDLINK TO WEBPAGE] (not up to date)
+This package is still in development and its API might change.
 
 ## Preprocessing
 
 ## General steps:
 
-### Bidsify the data:
+### Bidsify the data (0:12:59):
 
 -From scanner to BIDS, files should be renamed to be converted from PAR/REC to Nifti and bidsified. Renaming can be done using 'utils/rename_PAR4BIDS.sh':
 
 ```bash
-cd '{MAIN_PATH}/utils'
-source rename_PAR4BIDS.sh xxx
+source utils/rename_PAR4BIDS.sh xxx
 master -m 02a -s 001,002,xxx --lr #(long flag indicates PR direction of BOLD files; subjects separated with commas without spaces)
 ```
   Output:
@@ -28,7 +24,7 @@ master -m 02a -s 001,002,xxx --lr #(long flag indicates PR direction of BOLD fil
 
 ## Anatomical preprocessing:
 
-### Create T1w MP2RAGE image (if necessary):
+### Create T1w MP2RAGE image (if necessary; 00:07:15):
 ```bash
 master -m 04 -s 001 #spinoza_qmrimaps: creates T1w image from 1st and 2nd inversion images using Pymp2rage
 ```
@@ -83,7 +79,6 @@ Outputs:
 Outputs:
 - derivatives/freesurfer
 
-
 ## Functional preprocessing:
 
 ### Thermal denoising using NORDIC
@@ -103,27 +98,27 @@ Outputs:
 
 ### Motion Correction using SPM
 ```bash
-  qsub -V job_spmmoco.sh '[ProjectName]'
+  qsub -V job_spmmoco.sh 001 ret 1 1 #'[subject] [task] [session] [run]'
 ```
 Outputs:
-TODO: generate .nii.gz, remove (r)sub, copy to fmriprep/../../func 
+TODO: generate .nii.gz, remove (r)sub, copy to fmriprep/../../func
       rename meansub file
 
-### ROIs mask (based on the Benson atlas) to 
+### ROIs mask (based on the Benson atlas) to
 ```bash
   qsub -V jobCFLup01_project_benson_ores.sh 001
 ```    
 ### Upsampling anat
 ```bash
-  qsub -V jobCFLup02_upsampling_anat.sh 001
+  qsub -V jobCFLup02_upsampling_anat.sh 001 1 0.8 #'[subject] [session] [new_resolution] '
 ```
 ### Upsampling func
 ```bash
-  qsub -V jobCFLup04_upsampling_func_nordicfirst.sh 001
+  qsub -V jobCFLup04_upsampling_func_nordicfirst.sh 001 ret 1 4 0.8 #'[subject] [task] [session] [nruns] [new_resolution]'
 ```
 ### Upsampling boldref
 ```bash
-  qsub -V jobCFLup05_upsampling_boldref_spmmoco.sh 001
+  qsub -V jobCFLup05_upsampling_boldref_spmmoco.sh 001 1 0.8 #'[subject] [session] [new_resolution]'
 ```
 ### Coregistration
 - Run once to create folder structure
@@ -131,7 +126,7 @@ TODO: generate .nii.gz, remove (r)sub, copy to fmriprep/../../func
 - Re-run to coregistrate anat2func
 
 ```bash
-  qsub -V job_coreg_old_.sh 001
+  qsub -V job_coreg.sh 001
 ```
 ### Apply coregistration matrix to T1w, T2w
 
@@ -143,23 +138,68 @@ TODO: generate .nii.gz, remove (r)sub, copy to fmriprep/../../func
 ```bash
   code utils/vcode_cropping.ipynb
 ```
-### Run Freesurfer on upsampled anatomy 
+### Run Freesurfer on upsampled anatomy
 ```bash
   qsub -V -pe smp 16 job_freesurferHires.sh 16 001
 ```
-### Benson hires 
+### Benson hires
 ```bash
   conda activate mypy311 #environment where neuropythy is installed
   qsub -V job_project_benson_hires.sh 001
 ```
 
-### Resampling GM
-```bash
-  qsub -V job_resamplingGM_nordicfirst.sh 001
-```
 ### Fmriprep hires
 ```bash
   copy/move fmriprep low res to fmriprep ores
   Re-run fmriprep with hires anatomy obs: func can be the low res
+```
 
+## Resampling GM
+```bash
+  qsub -V job_resamplingGM_nordicfirst.sh 001
+```
+
+## Post-processing
+### Temporal denoising
+```bash
+  code /pRF_fitting/psc.ipynb #adjust subject, denoising and depth
+```
+Outputs:
+/derivatives/pRFM/{denoising}/*.npy  
+
+### Import subject to pycortex database
+```bash
+  code /pRF_fitting/import_fmriprepsubj.ipynb #adjust subject_id
+```
+Outputs:
+/derivatives/pRFM/{denoising}/*.npy  
+
+### Fit pRFs on smoothed data
+
+Stage 1: fit pRFs
+```bash
+qsub -V -pe smp 16 call_fitpRF_atlas.sh 001 nordic_sm4 GM benson #subject, denoising, depth and atlas
+#or
+qsub -V -pe smp 16 call_fitpRF_atlas.sh 001 nordic GM manual
+```
+Outputs:
+/derivatives/pRFM/{denoising}/*.npy  
+
+### Manual delineation of retinotopic areas
+
+TO BE WRITTEN
+
+## Laminar analysis
+
+## Layering using Wagstyl algorithm
+```bash
+  qsub -V job_wagstyl.sh 001
+```
+## Resampling to the layers
+```bash
+  qsub -V job_resamplingLayers.sh 001
+```
+### Temporal denoising
+```bash
+  code /Postproc/psc.ipynb #adjust subject, denoising and depth
 ```

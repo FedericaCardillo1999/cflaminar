@@ -9,16 +9,19 @@
 
 # Load modules
 module load afni
+module load AFNI #Habrok
 
-# Usage: source job_upsampling_anat.sh xxx /qsub -V script.sh xxx
+# Usage: qsub -V job_upsampling_anat.sh [subject] [session] [new resolution]/E.g. qsub -V script.sh 001 1 0.8
 # Upsamples Nifti files
 
 subject=sub-$1
-session=1
-echo "Running subject: $subject"
+session=$2
+new_res=$3
+echo "Running subject: $subject, session $session"
 
 OLDPWD=${PWD}
-PROJ_DIR=/data1/projects/dumoulinlab/Lab_members/Mayra/projects/CFLamUp
+PROJ_DIR=${DIR_DATA_HOME}
+
 cd $PROJ_DIR
 
 # ANAT
@@ -30,16 +33,23 @@ if [[ ! -d $UP_DIR ]]; then
 else
   echo "anat folder already exists."
 fi
-for suffix in acq-MP2RAGE_T1w acq-MP2RAGE_desc-spm_mask acq-MP2RAGE_T1map acq-3DTSE_T2w acq-MP2RAGE_desc-masked_T1w desc-benson_mask
+echo "Acquisition: ${ACQ}"
+
+for suffix in acq-${ACQ}_T1w acq-${ACQ}_desc-masked_T1w desc-benson_mask acq-3DTSE_T2w acq-${ACQ}_desc-spm_mask
 do
   if [[ ${suffix} == "acq-3DTSE_T2w" ]]; then
-  NII_DIR=$PROJ_DIR/derivatives/pymp2rage/${subject}/ses-${session}
-  elif [[ ${suffix} == "acq-MP2RAGE_desc-masked_T1w" ]]; then
-  NII_DIR=$PROJ_DIR/derivatives/masked_mp2rage/${subject}/ses-${session}/anat
+    NII_DIR=$PROJ_DIR/derivatives/pymp2rage/${subject}/ses-${session}
+  elif [[ ${suffix} == "acq-${ACQ}_desc-masked_T1w" ]]; then
+    NII_DIR=$PROJ_DIR/derivatives/masked_mp2rage/${subject}/ses-${session}/anat
   elif [[ ${suffix} == "desc-benson_mask" ]]; then
-  NII_DIR=${DIR_DATA_DERIV}/benson_mask/${subject}/ses-${session}
-  else
-  NII_DIR=$PROJ_DIR/derivatives/denoised/${subject}/ses-${session}
+    NII_DIR=${DIR_DATA_DERIV}/benson_mask/${subject}/ses-${session}
+  elif [[ ${suffix} == "desc-spm_mask" ]]; then
+    NII_DIR=$PROJ_DIR/derivatives/denoised/${subject}/ses-${session}
+    if [[ -f ${NII_DIR}/${subject}_ses-${session}_${suffix}.nii.gz ]]; then
+      echo "${suffix} not found, using fmriprep brain_mask instead."
+      NII_DIR=$PROJ_DIR/derivatives/fmriprep/${subject}/ses-${session}/anat
+      suffix=acq-${ACQ}_desc-brain_mask
+    fi
   fi
   # Backing up original resolution files
   if [[ ! -f ${UP_DIR}/${subject}_ses-${session}_${suffix}_ores.nii.gz ]]; then
@@ -48,16 +58,16 @@ do
     echo "backup of original resolution ${suffix} file already exists"
   fi
   if [[ ! -f ${UP_DIR}/${subject}_ses-${session}_${suffix}.nii.gz ]]; then
-  cp ${UP_DIR}/${subject}_ses-${session}_${suffix}_ores.nii.gz ${UP_DIR}/${subject}_ses-${session}_${suffix}.nii.gz
-  3dWarp -deoblique -prefix ${UP_DIR}/${subject}_ses-${session}_${suffix}.nii.gz -newgrid 0.4 ${UP_DIR}/${subject}_ses-${session}_${suffix}.nii.gz -overwrite > ${UP_DIR}/orient${suffix}_ores.1D
+    cp ${UP_DIR}/${subject}_ses-${session}_${suffix}_ores.nii.gz ${UP_DIR}/${subject}_ses-${session}_${suffix}.nii.gz
+    3dWarp -deoblique -prefix ${UP_DIR}/${subject}_ses-${session}_${suffix}.nii.gz -newgrid ${new_res} ${UP_DIR}/${subject}_ses-${session}_${suffix}.nii.gz -overwrite > ${UP_DIR}/orient${suffix}_ores.1D
 
   # 3dresample -dxyz 0.4 0.4 0.4 -rmode Cu -overwrite -prefix ${UP_DIR}/${subject}_ses-${session}_${suffix}.nii.gz -input ${UP_DIR}/${subject}_ses-${session}_${suffix}_ores.nii.gz
   # 3dWarp -deoblique ${UP_DIR}/${subject}_ses-${session}_${suffix}_ores.nii.gz -overwrite > ${UP_DIR}/orient${suffix}_ores.1D
   # 3dAllineate -trilinear -1Dmatrix_apply ${UP_DIR}/orient${suffix}_ores.1D -prefix ${UP_DIR}/${subject}_ses-${session}_${suffix}.nii.gz ${UP_DIR}/${subject}_ses-${session}_${suffix}.nii.gz -overwrite
-  cp -TRv ${UP_DIR}/${subject}_ses-${session}_${suffix}.nii.gz ${NII_DIR}/${subject}_ses-${session}_${suffix}.nii.gz
-  echo "${suffix} upsampled."
+    cp -TRv ${UP_DIR}/${subject}_ses-${session}_${suffix}.nii.gz ${NII_DIR}/${subject}_ses-${session}_${suffix}.nii.gz
+    echo "${suffix} upsampled."
   else
-  echo "${suffix} upsampled already exists."
+    echo "${suffix} upsampled already exists."
   fi
 done
 
